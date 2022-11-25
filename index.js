@@ -7,6 +7,9 @@ require('dotenv').config();
 const app = express();
 
 (async function () {
+    const {NGROK_TOKEN} = process.env;
+    await ngrok.authtoken(NGROK_TOKEN);
+    
     const url = await ngrok.connect();
     let { URL_SERVER } = process.env;
 
@@ -56,7 +59,6 @@ app.get('/getPointsInPolygon', function (req, res) {
         //request.query('select * from [gisadmin].[INTERFERENCIA] where ID_INTERFERENCIA < 2', function (err, recordset) {
         request.query(`DECLARE @g geometry;SET @g = geometry::STGeomFromText('${polygon}', 4674);SELECT * FROM [SRH].[gisadmin].[INTERFERENCIA] WHERE @g.STContains(SHAPE) = 1`, function (err, recordset) {
             if (err) console.log(err)
-
             // send records as a response
             res.send(JSON.stringify(recordset.recordsets));
 
