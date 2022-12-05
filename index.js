@@ -1,14 +1,18 @@
 const { application } = require('express');
 const express = require('express');
 const ngrok = require('ngrok');
+const xml2js = require('xml2js')
+
+
 const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 require('dotenv').config();
 
 const app = express();
 
+
 (async function () {
     // token ngrok - ver site da empresa
-    const {NGROK_TOKEN} = process.env;
+    const { NGROK_TOKEN } = process.env;
     await ngrok.authtoken(NGROK_TOKEN);
     // url tunel para localhost:80
     const url = await ngrok.connect();
@@ -64,6 +68,63 @@ app.get('/getPointsInPolygon', function (req, res) {
         });
     });
 });
+
+
+async function selectFinalidades() {
+    var sql = require("mssql");
+
+    // configurações do banco
+    var config = {
+        user: ADASA_USERNAME,
+        password: ADASA_PASSWORD,
+        server: ADASA_HOST,
+        database: ADASA_DATABASE,
+        trustServerCertificate: true,
+    };
+
+    //conexão com o banco
+    sql.connect(config, function (err) {
+
+        if (err) console.log(err);
+
+        // criar requirisão
+        var request = new sql.Request();
+        // polígono  que ser enviado no body
+        // requisição
+        let query = `
+        SELECT (
+            SELECT *
+            FROM [SRH].[gisadmin].[FINALIDADE] AS FIN
+            JOIN
+            [SRH].[gisadmin].[TIPO_FINALIDADE] AS TF
+            on
+            TF.ID_TIPO_FINALIDADE = FIN.ID_TIPO_FINALIDADE
+            WHERE ID_INTERFERENCIA = 1124
+            FOR XML  PATH('FINALIDADE'), ROOT('FINALIDADES')
+            ) AS FINALIDADES
+        `
+
+        //console.log(query)
+        request.query(query, function (err, recordset) {
+            if (err) console.log(err)
+            
+            let {FINALIDADES} = recordset.recordsets[0][0];
+
+           console.log(FINALIDADES);
+
+           xml2js.parseString(FINALIDADES, (err, result) => {
+            if (err) {
+              throw err
+            }
+            const json = JSON.stringify(result, null, 4)
+     
+            console.log(json)
+          })
+        });
+    });
+}
+
+selectFinalidades()
 
 app.listen(80, function () {
     console.log('Server is running..');
