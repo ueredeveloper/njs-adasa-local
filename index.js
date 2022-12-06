@@ -1,13 +1,23 @@
 const { application } = require('express');
 const express = require('express');
 const ngrok = require('ngrok');
-const xml2js = require('xml2js')
-
-
+const xml2js = require('xml2js');
+const { dis_tub_query } = require('./services/queries')
 const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
+const sql = require("mssql");
 require('dotenv').config();
 
 const app = express();
+
+const { ADASA_DATABASE, ADASA_USERNAME, ADASA_PASSWORD, ADASA_HOST } = process.env;
+// configurações do banco
+const config = {
+    user: ADASA_USERNAME,
+    password: ADASA_PASSWORD,
+    server: ADASA_HOST,
+    database: ADASA_DATABASE,
+    trustServerCertificate: true,
+};
 
 
 (async function () {
@@ -20,6 +30,7 @@ const app = express();
     let { URL_SERVER } = process.env;
 
     console.log(`${url}/getPointsInPolygon`)
+    console.log(`${url}/getDisponibilidade`)
     // enviar url tunel sempre atualizada
     const body = { url: url };
 
@@ -36,21 +47,8 @@ const app = express();
 })();
 
 
-const { ADASA_DATABASE, ADASA_USERNAME, ADASA_PASSWORD, ADASA_HOST } = process.env;
-
 app.get('/getPointsInPolygon', function (req, res) {
     // mudar para post e assim enviar um polígono para o servidor repl.it
-
-    var sql = require("mssql");
-
-    // configurações do banco
-    var config = {
-        user: ADASA_USERNAME,
-        password: ADASA_PASSWORD,
-        server: ADASA_HOST,
-        database: ADASA_DATABASE,
-        trustServerCertificate: true,
-    };
 
     //conexão com o banco
     sql.connect(config, function (err) {
@@ -69,18 +67,28 @@ app.get('/getPointsInPolygon', function (req, res) {
     });
 });
 
+app.get('/getDisponibilidade', function (req, res) {
+    console.log('getDisponibilidade')
+    //conexão com o banco
+    sql.connect(config, function (err) {
+
+        if (err) console.log(err);
+
+        // criar requirisão
+        var request = new sql.Request();
+        // polígono  que ser enviado no body
+        let _dis_tub_query = dis_tub_query;
+        // requisição
+        request.query(_dis_tub_query, function (err, recordset) {
+            if (err) console.log(err)
+            console.log(recordset)
+            res.send(JSON.stringify(recordset.recordsets));
+        });
+    });
+})
+
 
 async function selectFinalidades() {
-    var sql = require("mssql");
-
-    // configurações do banco
-    var config = {
-        user: ADASA_USERNAME,
-        password: ADASA_PASSWORD,
-        server: ADASA_HOST,
-        database: ADASA_DATABASE,
-        trustServerCertificate: true,
-    };
 
     //conexão com o banco
     sql.connect(config, function (err) {
@@ -107,24 +115,58 @@ async function selectFinalidades() {
         //console.log(query)
         request.query(query, function (err, recordset) {
             if (err) console.log(err)
-            
-            let {FINALIDADES} = recordset.recordsets[0][0];
 
-           console.log(FINALIDADES);
+            let { FINALIDADES } = recordset.recordsets[0][0];
 
-           xml2js.parseString(FINALIDADES, (err, result) => {
-            if (err) {
-              throw err
-            }
-            const json = JSON.stringify(result, null, 4)
-     
-            console.log(json)
-          })
+            console.log(FINALIDADES);
+
+            xml2js.parseString(FINALIDADES, (err, result) => {
+                if (err) {
+                    throw err
+                }
+                const json = JSON.stringify(result, null, 4)
+
+                console.log(json)
+            })
         });
     });
 }
+/**
+ * Inserir pontos de outorga no banco de dados postgress - supabase
+ */
 
-selectFinalidades()
+let sup_url = 'https://njs-pg-sb-drainage.ueredeveloper.repl.co'
+async function insertPoints() {
+    sql.connect(config, function (err) {
+
+        if (err) console.log(err);
+
+        // criar requirisão
+        var request = new sql.Request();
+        // polígono  que ser enviado no body
+        let _dis_tub_query = dis_tub_query();
+        // requisição
+        request.query(_dis_tub_query, async function (err, recordset) {
+            if (err) console.log('------------->', err)
+            //let {fin_finalidade} = recordset.recordsets[0][0]
+            // console.log(PROCESSO)
+
+            // transformar o xml lower case aqui, antes de enviar
+
+            const response = await fetch(`${sup_url}/insertPoints`, {
+                method: 'POST',
+                body: JSON.stringify(recordset.recordsets[0]),
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const data = await response.json();
+            console.log(data)
+            //res.send(JSON.stringify(data))
+            //res.send(JSON.stringify(recordset.recordsets));
+        });
+    });
+}
+insertPoints()
+//selectFinalidades()
 
 app.listen(80, function () {
     console.log('Server is running..');
