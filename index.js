@@ -6,10 +6,12 @@ const { dis_tub_query } = require('./services/queries')
 const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 const sql = require("mssql");
 require('dotenv').config();
+const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
 
-const { ADASA_DATABASE, ADASA_USERNAME, ADASA_PASSWORD, ADASA_HOST } = process.env;
+const { ADASA_DATABASE, ADASA_USERNAME, ADASA_PASSWORD, ADASA_HOST, SUPABASE_URL, SUPABASE_KEY } = process.env;
+
 // configurações do banco
 const config = {
     user: ADASA_USERNAME,
@@ -19,6 +21,7 @@ const config = {
     trustServerCertificate: true,
 };
 
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 (async function () {
     // token ngrok - ver site da empresa
@@ -148,11 +151,42 @@ async function insertPoints() {
         // requisição
         request.query(_dis_tub_query, async function (err, recordset) {
             if (err) console.log('------------->', err)
-            //let {fin_finalidade} = recordset.recordsets[0][0]
-            // console.log(PROCESSO)
 
-            // transformar o xml lower case aqui, antes de enviar
+            let outorga = recordset.recordsets[0];
+            // capturar lng e lat => x, y
+            let { x, y } = outorga[0].int_shape.points[0];
+            let { fin_finalidade, dt_demanda } = outorga[0];
+            // modificar o objeto para o formato do banco postgres
+            outorga[0].int_shape = `POINT(${x} ${y})`;
 
+            xml2js.parseString(
+                fin_finalidade,
+                { explicitRoot: false, normalizeTags: true }, (err, result) => {
+                    if (err) {
+                        throw err
+                    }
+                    outorga[0].fin_finalidade = JSON.stringify(result)
+                });
+
+            xml2js.parseString(dt_demanda, { explicitRoot: false, normalizeTags: true }, (err, result) => {
+                if (err) {
+                    throw err
+                }
+                outorga[0].dt_demanda = JSON.stringify(result)
+            });
+
+            const { data, error } = await supabase
+                .from('outorgas')
+                .upsert(outorga[0],
+                    { onConflict: 'int_id' })
+                .select()
+            if (error) {
+                console.log(JSON.stringify({ message: error }))
+            } else {
+                console.log(JSON.stringify({ message: error, data: data }))
+            }
+
+            /*
             const response = await fetch(`${sup_url}/insertPoints`, {
                 method: 'POST',
                 body: JSON.stringify(recordset.recordsets[0]),
@@ -161,7 +195,7 @@ async function insertPoints() {
             const data = await response.json();
             console.log(data)
             //res.send(JSON.stringify(data))
-            //res.send(JSON.stringify(recordset.recordsets));
+            //res.send(JSON.stringify(recordset.recordsets));*/
         });
     });
 }
