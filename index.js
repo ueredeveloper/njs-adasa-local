@@ -150,52 +150,47 @@ async function insertPoints() {
         let _dis_tub_query = dis_tub_query();
         // requisição
         request.query(_dis_tub_query, async function (err, recordset) {
-            if (err) console.log('------------->', err)
+            if (err) console.log('------------->', err);
 
-            let outorga = recordset.recordsets[0];
-            // capturar lng e lat => x, y
-            let { x, y } = outorga[0].int_shape.points[0];
-            let { fin_finalidade, dt_demanda } = outorga[0];
-            // modificar o objeto para o formato do banco postgres
-            outorga[0].int_shape = `POINT(${x} ${y})`;
+            let _outorgas = recordset.recordsets[0].map(outorga => {
+                // conversão para o formato postgres
+                let { x, y } = outorga.int_shape.points[0]
+                outorga.int_shape = `POINT(${x} ${y})`;
+                // conversão xml to json
+                xml2js.parseString(
+                    outorga.fin_finalidade,
+                    { explicitRoot: false, normalizeTags: true }, (err, result) => {
+                        if (err) {
+                            throw err
+                        }
+                        outorga.fin_finalidade = result
+                    });
+                // conversão xml to json
+                xml2js.parseString(outorga.dt_demanda,
+                    { explicitRoot: false, normalizeTags: true }, (err, result) => {
+                        if (err) {
+                            throw err
+                        }
+                        outorga.dt_demanda = result
+                    });
+                return outorga;
+            })
 
-            xml2js.parseString(
-                fin_finalidade,
-                { explicitRoot: false, normalizeTags: true }, (err, result) => {
-                    if (err) {
-                        throw err
-                    }
-                    outorga[0].fin_finalidade = result
-                });
-
-            xml2js.parseString(dt_demanda, { explicitRoot: false, normalizeTags: true }, (err, result) => {
-                if (err) {
-                    throw err
-                }
-                outorga[0].dt_demanda = result
+            _outorgas.forEach(o => {
+                console.log(o.fin_finalidade, o.dt_demanda)
             });
+
 
             const { data, error } = await supabase
                 .from('outorgas')
-                .upsert(outorga,
+                .upsert(_outorgas,
                     { onConflict: 'int_id' })
                 .select()
             if (error) {
                 console.log(JSON.stringify({ message: error }))
             } else {
-                console.log(JSON.stringify({ message: error, data: data }))
+                console.log(JSON.stringify({ message: 'ok', data: data }))
             }
-
-            /*
-            const response = await fetch(`${sup_url}/insertPoints`, {
-                method: 'POST',
-                body: JSON.stringify(recordset.recordsets[0]),
-                headers: { 'Content-Type': 'application/json' }
-            });
-            const data = await response.json();
-            console.log(data)
-            //res.send(JSON.stringify(data))
-            //res.send(JSON.stringify(recordset.recordsets));*/
         });
     });
 }
