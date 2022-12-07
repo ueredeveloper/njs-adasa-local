@@ -165,19 +165,19 @@ async function insertPoints() {
                     if (err) {
                         throw err
                     }
-                    outorga[0].fin_finalidade = JSON.stringify(result)
+                    outorga[0].fin_finalidade = result
                 });
 
             xml2js.parseString(dt_demanda, { explicitRoot: false, normalizeTags: true }, (err, result) => {
                 if (err) {
                     throw err
                 }
-                outorga[0].dt_demanda = JSON.stringify(result)
+                outorga[0].dt_demanda = result
             });
 
             const { data, error } = await supabase
                 .from('outorgas')
-                .upsert(outorga[0],
+                .upsert(outorga,
                     { onConflict: 'int_id' })
                 .select()
             if (error) {
