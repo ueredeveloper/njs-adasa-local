@@ -1,8 +1,9 @@
 /**
  * Busca colunas para o calculo da disponibilidade no sistema tubular.
+ *  tipo poço = 1 manual, 2 tubular
  * @returns 
  */
-exports.dis_tub_query = function () {
+exports.dis_tub_query = function (less, grater) {
     return `
     SELECT 
         U.ID_USUARIO AS us_id,
@@ -53,6 +54,6 @@ exports.dis_tub_query = function () {
     LEFT JOIN [SRH].[gisadmin].[UNIDADES_HIDROGRAFICAS] AS UH ON I.[ID_UH] = UH.[OBJECTID] /* COMO VINCULAR BACIA COM UH -> ID_BACIA*/
     LEFT JOIN [SRH].[gisadmin].[BACIAS_HIDROGRAFICAS] AS BH ON UH.[ID_BACIA] = BH.[OBJECTID_1]
     JOIN [SRH].[gisadmin].[HIDROGEO_FRATURADO_UH] AS HF ON HF.Shape.STContains(I.SHAPE) = 1 /* CONDITION */
-    WHERE SUB.[ID_TIPO_POCO] = 2 AND I.ID_INTERFERENCIA > 3000 AND I.ID_INTERFERENCIA < 3150
+    WHERE SUB.[ID_TIPO_POCO] = 1 AND I.ID_INTERFERENCIA >= ${less} AND I.ID_INTERFERENCIA <= ${grater}
     `
 }

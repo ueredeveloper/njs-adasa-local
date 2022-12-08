@@ -22,7 +22,7 @@ const config = {
 };
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-
+/*
 (async function () {
     // token ngrok - ver site da empresa
     const { NGROK_TOKEN } = process.env;
@@ -48,6 +48,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
     console.log(data);
 
 })();
+*/
 
 
 app.get('/getPointsInPolygon', function (req, res) {
@@ -147,63 +148,84 @@ async function insertPoints() {
         // criar requirisão
         var request = new sql.Request();
 
-        for(let i=1;i<10;i=i+10) {
-            console.log(i)
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
         }
-        // polígono  que ser enviado no body
-        let _dis_tub_query = dis_tub_query();
-        // requisição
 
-        /*
-        request.query(_dis_tub_query, async function (err, recordset) {
-            if (err) console.log('------------->', err);
+        function saveEveryHundred() {
+            let begin = new Date();
+            let time = 3000;
+            for (let i = 0; i <= 15000; i = i + 100) {
 
-            let _outorgas = recordset.recordsets[0].map(outorga => {
-                // conversão para o formato postgres
-                let { x, y } = outorga.int_shape.points[0]
-                outorga.int_shape = `POINT(${x} ${y})`;
-                // conversão xml to json
-                xml2js.parseString(
-                    outorga.fin_finalidade,
-                    { explicitRoot: false, normalizeTags: true }, (err, result) => {
-                        if (err) {
-                            throw err
+                sleep(time).then(() => {
+                    let ii = i + 100
+                    let now = new Date()
+                    console.log('-----', i, ii, begin.getSeconds(), now.getSeconds());
+
+                    let _dis_tub_query = dis_tub_query(i, ii);
+                    // requisição
+
+                    request.query(_dis_tub_query, async function (err, recordset) {
+                        if (err) console.log(err);
+
+                        let _outorgas = recordset.recordsets[0].map((outorga, index) => {
+
+                            console.log(outorga.int_id, index)
+                            // conversão para o formato postgres
+                            let { x, y } = outorga.int_shape.points[0]
+                            outorga.int_shape = `POINT(${x} ${y})`;
+                            if (outorga.fin_finalidade != null) {
+
+
+                                // conversão xml to json
+                                xml2js.parseString(
+                                    outorga.fin_finalidade,
+                                    { explicitRoot: false, normalizeTags: true }, (err, result) => {
+                                        if (err) {
+                                            throw err
+                                        }
+                                        outorga.fin_finalidade = result
+                                    });
+                            }
+                            if (outorga.dt_demanda != null) {
+                                // conversão xml to json
+                                xml2js.parseString(outorga.dt_demanda,
+                                    { explicitRoot: false, normalizeTags: true }, (err, result) => {
+                                        if (err) {
+                                            throw err
+                                        }
+                                        outorga.dt_demanda = result
+                                    });
+                            }
+
+                            return outorga;
+                        })
+                        const { data, error } = await supabase
+                            .from('outorgas')
+                            .upsert(_outorgas,
+                                { onConflict: 'int_id' })
+                            .select()
+                        if (error) {
+                            console.log(JSON.stringify({ message: error }))
+                        } else {
+                            console.log(JSON.stringify({ message: 'ok' }))
                         }
-                        outorga.fin_finalidade = result
                     });
-                // conversão xml to json
-                xml2js.parseString(outorga.dt_demanda,
-                    { explicitRoot: false, normalizeTags: true }, (err, result) => {
-                        if (err) {
-                            throw err
-                        }
-                        outorga.dt_demanda = result
-                    });
-                return outorga;
-            })
 
-            _outorgas.forEach(o => {
-                console.log(o.fin_finalidade, o.dt_demanda)
-            });
+                });
+                time = time + 3000
 
-
-            const { data, error } = await supabase
-                .from('outorgas')
-                .upsert(_outorgas,
-                    { onConflict: 'int_id' })
-                .select()
-            if (error) {
-                console.log(JSON.stringify({ message: error }))
-            } else {
-                console.log(JSON.stringify({ message: 'ok'}))
             }
-        });
-        */
+        }
+
+        saveEveryHundred();
+
     });
 }
 insertPoints()
 //selectFinalidades()
 
+/*
 app.listen(80, function () {
     console.log('Server is running..');
-});
+});*/
