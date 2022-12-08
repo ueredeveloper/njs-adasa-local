@@ -146,9 +146,15 @@ async function insertPoints() {
 
         // criar requirisão
         var request = new sql.Request();
+
+        for(let i=1;i<10;i=i+10) {
+            console.log(i)
+        }
         // polígono  que ser enviado no body
         let _dis_tub_query = dis_tub_query();
         // requisição
+
+        /*
         request.query(_dis_tub_query, async function (err, recordset) {
             if (err) console.log('------------->', err);
 
@@ -189,9 +195,10 @@ async function insertPoints() {
             if (error) {
                 console.log(JSON.stringify({ message: error }))
             } else {
-                console.log(JSON.stringify({ message: 'ok', data: data }))
+                console.log(JSON.stringify({ message: 'ok'}))
             }
         });
+        */
     });
 }
 insertPoints()
