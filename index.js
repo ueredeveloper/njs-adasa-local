@@ -2,7 +2,7 @@ const { application } = require('express');
 const express = require('express');
 const ngrok = require('ngrok');
 const xml2js = require('xml2js');
-const { dis_tub_query } = require('./services/queries')
+const { dis_tub_query, dis_sup_query } = require('./services/queries')
 const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 const sql = require("mssql");
 require('dotenv').config();
@@ -222,7 +222,93 @@ async function insertPoints() {
 
     });
 }
-insertPoints()
+//insertPoints()
+
+async function upsertSupPoints () {
+    sql.connect(config, function (err) {
+
+        if (err) console.log(err);
+
+        // criar requirisão
+        var request = new sql.Request();
+
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        function saveEveryHundred() {
+            let begin = new Date();
+            let time = 3000;
+            for (let i = 600; i <= 603; i = i + 1) {
+
+                sleep(time).then(() => {
+                    let ii = i + 100
+                    let now = new Date()
+                    console.log('-----', i, ii, begin.getSeconds(), now.getSeconds());
+
+                    let _dis_sup_query = dis_sup_query(i, ii);
+                    // requisição
+
+                    request.query(_dis_sup_query, async function (err, recordset) {
+                        if (err) console.log(err);
+
+                        let _outorgas = recordset.recordsets[0].map((outorga, index) => {
+
+                            console.log(outorga.int_id, index)
+                            // conversão para o formato postgres
+                            let { x, y } = outorga.int_shape.points[0]
+                            outorga.int_shape = `POINT(${x} ${y})`;
+                            if (outorga.fin_finalidade != null) {
+
+
+                                // conversão xml to json
+                                xml2js.parseString(
+                                    outorga.fin_finalidade,
+                                    { explicitRoot: false, normalizeTags: true }, (err, result) => {
+                                        if (err) {
+                                            throw err
+                                        }
+                                        outorga.fin_finalidade = result
+                                    });
+                            }
+                            if (outorga.dt_demanda != null) {
+                                // conversão xml to json
+                                xml2js.parseString(outorga.dt_demanda,
+                                    { explicitRoot: false, normalizeTags: true }, (err, result) => {
+                                        if (err) {
+                                            throw err
+                                        }
+                                        outorga.dt_demanda = result
+                                    });
+                            }
+
+                            console.log(outorga)
+
+                            return outorga;
+                        })
+                        const { data, error } = await supabase
+                            .from('superficial')
+                            .upsert(_outorgas,
+                                { onConflict: 'int_id' })
+                            .select()
+                        if (error) {
+                            console.log(JSON.stringify({ message: error }))
+                        } else {
+                            console.log(JSON.stringify({ message: 'ok' }))
+                        }
+                    });
+
+                });
+                time = time + 3000
+
+            }
+        }
+
+        saveEveryHundred();
+
+    });
+}
+upsertSupPoints()
 //selectFinalidades()
 
 /*
